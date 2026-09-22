@@ -11,7 +11,7 @@ on:
 jobs:
   contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -43,6 +43,12 @@ jobs:
 
       - name: Verify contract outputs
         run: python verify_preaccess_outputs.py --out review/preaccess_run
+
+      - name: Build reproducible container
+        run: docker build -t dicom-study-inspector:ci .
+
+      - name: Run contract inside container
+        run: docker run --rm dicom-study-inspector:ci
 
       - name: Upload audit outputs
         if: always()
