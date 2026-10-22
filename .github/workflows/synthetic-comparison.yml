@@ -1,0 +1,29 @@
+name: Synthetic DICOM comparison and echo contract
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -r requirements-real-data.txt
+      - run: python -m pytest -q
+      - run: python make_preaccess_fixture.py --out review/fixture --n 36
+      - name: Existing credential-free synthetic echo contract
+        run: |
+          python echoview_inspect_v2.py \
+            --echoview review/fixture/MIMIC_ECHO_View_Classifications.synthetic.csv \
+            --record-list review/fixture/echo-record-list.synthetic.csv \
+            --dicom-root review/fixture/dicom --out review/echo --n 20
+          python verify_preaccess_outputs.py --out review/echo
+      # Deliberately no real-data acquisition and no artifact upload.
