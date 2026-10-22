@@ -41,8 +41,22 @@ ALLOWED = {
     },
     "exporting": {"artifacts", "config", "decoding", "pixels"},
     "measurements": {"config", "metadata", "pixels"},
-    "reporting": {"artifacts", "config", "structure"},
+    "reporting": {"artifacts", "config", "structure", "completion"},
+    "completion": {"config"},
+    "audit_metadata": {"config"},
+    "audit_pixels": {"artifacts"},
+    "audit_records": set(),
+    "audit_coverage": {"config", "audit_records"},
+    "scientific_audit": {
+        "artifacts",
+        "config",
+        "audit_coverage",
+        "audit_metadata",
+        "audit_pixels",
+        "audit_records",
+    },
     "comparison": {
+        "completion",
         "artifacts",
         "config",
         "decoding",
@@ -53,7 +67,7 @@ ALLOWED = {
         "reporting",
         "structure",
     },
-    "verification": {"artifacts", "config", "decoding", "pixels"},
+    "verification": {"artifacts", "config", "decoding", "pixels", "scientific_audit"},
 }
 OFFLINE_FORBIDDEN = {
     "acquisition",

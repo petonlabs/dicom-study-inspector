@@ -10,6 +10,7 @@ from .artifacts import artifact_hashes, inside, load, sha
 from .config import CHECKSUMS_FILE, EXPORT_MANIFEST_FILE, METADATA_FILE
 from .decoding import Decoder, normalize_frames, select_decoder
 from .pixels import DisplayTransform, read_pngs
+from .scientific_audit import audit_scientific_outputs
 
 
 @dataclass(frozen=True)
@@ -146,5 +147,13 @@ def verify(
     verify_sources(manifest, manifest_path.parent)
     files = verify_artifacts(results)
     decoder = select_decoder(manifest.get("decoder", "native"), decoder_backend)
-    verify_exports(VerificationContext(manifest_path.parent, results, manifest, decoder), export)
-    return verification_summary(manifest, export, files)
+    context = VerificationContext(manifest_path.parent, results, manifest, decoder)
+    verify_exports(context, export)
+    return verified_result(context, export, files)
+
+
+def verified_result(context, export, files):
+    return {
+        **verification_summary(context.manifest, export, files),
+        **audit_scientific_outputs(context, export),
+    }

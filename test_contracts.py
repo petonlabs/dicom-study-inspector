@@ -37,7 +37,7 @@ def test_decoder_exporter_substitution_contract(tmp_path, wrapped):
     assert result["comparison_passed"] and result["png_only"]["all_matched"] == 2
     assert verify(manifest, tmp_path / "out", decoder_backend=decoder)["verified_exports"] == 1
     if wrapped:
-        assert decoder.calls == ["prepare", "decode", "decode"]
+        assert decoder.calls == ["prepare", "decode", "decode", "decode"]
         assert len(exporter.calls) == 1
 
 

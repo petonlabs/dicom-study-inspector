@@ -27,3 +27,8 @@ for the separate `study_compare.py acquire`, `compare`, and `verify` commands.
 Only acquisition accesses the network; source DICOM and all patient-level outputs
 remain in ignored `review/`. PNG metadata retention and pixel quantization are
 measured without making claims about clinical information loss.
+
+The [scientific verification follow-up](SCIENTIFIC_VERIFICATION.md) documents strict
+completion semantics, independent offline reconciliation, adversarial tests and the
+bounded methods-note GO recommendation. A valid partial result can pass verification
+without passing the experiment's full-completion gates.
