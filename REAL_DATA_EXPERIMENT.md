@@ -157,43 +157,60 @@ CLI/acquisition dependency has been removed.
 
 | Boundary | Responsibility |
 |---|---|
-| `config` | Field inventory, limits, allowed lossless syntaxes, pinned decoder policy, source URLs and artifact names |
-| `artifacts` | JSON/CSV persistence, safe local paths, hashes, dependency and implementation provenance |
-| `metadata` / `structure` | Inventory/retention and hierarchy/spatial/temporal calculations |
-| `pixels` | Decoder/export adapter and the shared immutable `DisplayTransform` contract |
-| `transport` | Narrow `ArchiveTransport` protocol and bounded HTTP implementation |
-| `acquisition` | Selection, budget reservations and source manifest lifecycle |
-| `comparison` / `verification` | Offline use cases; measurement and independent artifact/source validation |
+| Policy and artifacts | Central field inventory, limits, syntax policy, JSON/CSV persistence, safe paths and hashes |
+| Acquisition | Separate catalog parsing/cache, sample selection, budget reservations, persisted state and download eligibility |
+| Metadata and geometry | Pure value eligibility/matching, sequence traversal, UID linkage, temporal intervals and spatial compatibility |
+| Decoder/export adapters | Narrow `Decoder` and `Exporter` protocols; bounded native/lossless decoding and the unchanged inspector exporter |
+| Comparison | Typed instance inputs/results, separate export provenance, measurements and report serialization |
+| Verification | Independent source, sidecar, derivative, transform and frame checks; rehashed corrupt pixels still fail |
 
 ```mermaid
 flowchart TD
-    CLI[CLI composition] --> A[Acquisition]
-    CLI --> C[Comparison]
-    CLI --> V[Verification]
-    A --> T[Injected transport]
-    A --> B[Injected bootstrap validation callback]
-    C --> M[Metadata and structure]
-    C --> P[Pixels and display transform]
+    CLI[CLI composition] --> A[Acquisition orchestration]
+    CLI --> C[Offline comparison]
+    CLI --> V[Offline verification]
+    A --> S[Selection and catalog]
+    A --> B[Persisted budget and download lifecycle]
+    S --> T[Injected transport]
+    B --> T
+    A --> BOOT[Injected bootstrap callback]
+    C --> M[Pure metadata and geometry]
+    C --> D[Injected decoder]
+    C --> E[Injected exporter]
+    V --> D
+    C --> P[Shared display transformation]
     V --> P
-    A --> IO[Artifact I/O]
-    C --> IO
-    V --> IO
-    M --> CFG[Shared configuration]
-    P --> CFG
-    T --> CFG
-    IO --> CFG
+    C --> R[Measurements and report writing]
 ```
 
-Acquisition does not import comparison or verification; the CLI injects the first-
-comparison validation callback. Tests can replace HTTP with an in-memory transport.
-Comparison/verification cannot reach acquisition through their package dependencies.
-The immutable display transformation is shared by measurement and verification;
-the unchanged original inspector remains the independent export implementation.
+Acquisition does not import analysis services. Comparison and verification cannot
+reach acquisition or HTTP through their transitive package dependencies. Existing
+CLI flags and serialized result schemas remain unchanged. `compare` accepts optional
+keyword-only decoder/exporter adapters; `verify` accepts an optional decoder adapter.
+Default calls continue to use the existing inspector and the manifest's decoder policy.
 
-`test_architecture.py` enforces the allowed dependency graph and module-level imports,
-checks a known quantization/inverse example, and exercises an injected network-free
-transport. Existing CLI flags and on-disk result schemas are preserved. No general
-plugin framework or speculative dataset abstraction is introduced.
+Acquisition options, sample requests, per-instance inputs and comparison results use
+small typed records. Comparison returns annotated inventory rows without mutating its
+input inventory. Shared eligibility, matching, frame normalization and interval helpers
+have one implementation; verification independently checks the exported evidence.
+
+Every function/method in the new implementation, CLI, tests and test helpers is limited
+to **15 physical lines**, including signatures, comments, blank lines and docstrings;
+decorators are excluded. Existing inspector/ECHOVIEW modules are outside this refactor.
+AST tests enforce this limit, module-level imports, unpacked statements, relative and
+absolute dependency boundaries, cycle rejection and offline transitive dependencies.
+Protocol ellipsis declarations are allowed; executable statements cannot be packed.
+The implementation is formatted with Ruff at a 100-character target line length.
+
+The refactor includes two explicit acquisition error-handling improvements: malformed
+object descriptors fail before any network request/reservation, and only a typed budget
+exhaustion can finish a partial sample. Unrelated catalog/validation errors propagate
+instead of silently freezing acquisition as complete. Interrupted reservations remain
+charged, and truncated series listings are reported once even without eligible samples.
+
+No general plugin framework or dataset abstraction is introduced. Interfaces exist at
+actual transport/decoder/exporter boundaries, with synthetic substitution and failure
+contracts covering their observable behavior.
 
 ## Verified local results (2026-10-21; pending human approval)
 
@@ -226,15 +243,18 @@ quantization error; these errors are in stored-pixel units, not calibrated clini
 units. All sampled instances were single-frame: this run supplies no real cine
 or variable-frame-timing evidence.
 
-The architecture refactor was checked against the pre-refactor real outputs:
-measurement tables, inventories, hierarchy, image artifacts and provenance mappings
-remained identical (74 artifacts); only recorded implementation hashes in the summary
-and report changed. Two current-code runs matched all **76 artifact hashes** and
-independently passed offline verification. All **39 tests passed** independently.
-The final local runs
-are `review/osteosarc/architecture-results` and `architecture-repeat`.
+The small-function refactor was reverified on **2026-10-22** against the prior real
+outputs: measurement tables, inventories, hierarchy, image artifacts and provenance
+mappings remained identical (74 artifacts). Only implementation hashes in the summary
+and report changed. Two current-code runs matched all **76 artifact hashes** and passed
+offline verification. The **72-test** suite and the unchanged 36-fixture/20-case
+ECHOVIEW synthetic workflow passed. Independent review covered responsibilities,
+reuse, readability, function-size enforcement and real-data reproducibility.
+The current local runs are `review/osteosarc/solid-final-results` and
+`review/osteosarc/solid-final-repeat`; no new source downloads were performed.
 
 The source manifest and all patient-level evidence remain local under ignored
-`review/`. No push, merge, issue posting or publication was performed. Independent
-technical review supports the experiment; human approval is still required before
+`review/`. Only code, synthetic tests and aggregate documentation are included in draft PR #2;
+no dataset content is committed or uploaded. No merge or research publication was performed.
+Independent technical review supports the experiment; human approval is still required before
 calling the research output final.

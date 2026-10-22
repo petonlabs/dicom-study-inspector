@@ -19,9 +19,7 @@ def sha(path):
 
 
 def dump(path, value):
-    Path(path).write_text(
-        json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
-    )
+    Path(path).write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
 
 
 def load(path):
@@ -59,9 +57,7 @@ def write_csv(path, rows):
         for r in rows:
             writer.writerow(
                 {
-                    k: json.dumps(v, sort_keys=True)
-                    if isinstance(v, (dict, list))
-                    else v
+                    k: json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else v
                     for k, v in r.items()
                 }
             )

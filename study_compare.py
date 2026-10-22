@@ -18,39 +18,47 @@ def validate_first_comparison(manifest: Path, output: Path) -> bool:
     return True
 
 
-def main():
+def acquisition_arguments(parser):
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--max-instances", type=int, default=MAX_INSTANCES)
+    parser.add_argument("--max-bytes", type=int, default=MAX_DOWNLOAD_BYTES)
+    parser.add_argument("--first-only", action="store_true")
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--decoder", choices=["native", "gdcm"], default="native")
+
+
+def argument_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    acq = sub.add_parser("acquire")
-    acq.add_argument("--out", type=Path, required=True)
-    acq.add_argument("--max-instances", type=int, default=MAX_INSTANCES)
-    acq.add_argument("--max-bytes", type=int, default=MAX_DOWNLOAD_BYTES)
-    acq.add_argument("--first-only", action="store_true")
-    acq.add_argument("--resume", action="store_true")
-    acq.add_argument("--decoder", choices=["native", "gdcm"], default="native")
-    comp = sub.add_parser("compare")
-    comp.add_argument("--manifest", type=Path, required=True)
-    comp.add_argument("--out", type=Path, required=True)
-    ver = sub.add_parser("verify")
-    ver.add_argument("--manifest", type=Path, required=True)
-    ver.add_argument("--results", type=Path, required=True)
+    acquisition_arguments(sub.add_parser("acquire"))
+    for command, output in [("compare", "out"), ("verify", "results")]:
+        child = sub.add_parser(command)
+        child.add_argument("--manifest", type=Path, required=True)
+        child.add_argument("--" + output, type=Path, required=True)
+    return parser
+
+
+def execute(args):
+    if args.command == "acquire":
+        return acquire(
+            args.out,
+            args.max_instances,
+            args.max_bytes,
+            args.first_only,
+            args.resume,
+            args.decoder,
+            validate_first=validate_first_comparison,
+        )
+    if args.command == "compare":
+        return compare(args.manifest, args.out)
+    return verify(args.manifest, args.results)
+
+
+def main():
+    parser = argument_parser()
     args = parser.parse_args()
     try:
-        if args.command == "acquire":
-            result = acquire(
-                args.out,
-                args.max_instances,
-                args.max_bytes,
-                args.first_only,
-                args.resume,
-                args.decoder,
-                validate_first=validate_first_comparison,
-            )
-        elif args.command == "compare":
-            result = compare(args.manifest, args.out)
-        else:
-            result = verify(args.manifest, args.results)
-        print(json.dumps(result, indent=2))
+        print(json.dumps(execute(args), indent=2))
     except Exception as exc:
         parser.exit(1, f"{type(exc).__name__}: {exc}\n")
 

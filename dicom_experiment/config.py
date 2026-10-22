@@ -21,9 +21,7 @@ COMMON = {
 
 PIXEL_TAGS = {"7FE00010", "7FE00008", "7FE00009"}
 
-LOSSLESS_SYNTAXES = {
-    "1.2.840.10008.1.2.4." + suffix for suffix in ("57", "70", "80", "90")
-}
+LOSSLESS_SYNTAXES = {"1.2.840.10008.1.2.4." + suffix for suffix in ("57", "70", "80", "90")}
 
 MAX_INSTANCES = 20
 MAX_DOWNLOAD_BYTES = 100 * 1024**2

@@ -25,9 +25,7 @@ class HttpArchiveTransport:
         return data
 
     def content_length(self, url: str) -> int:
-        with request.urlopen(
-            request.Request(url, method="HEAD"), timeout=45
-        ) as response:
+        with request.urlopen(request.Request(url, method="HEAD"), timeout=45) as response:
             return int(response.headers["Content-Length"])
 
     def download(self, url: str, destination: Path, expected_size: int) -> int:
