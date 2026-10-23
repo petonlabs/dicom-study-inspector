@@ -5,7 +5,8 @@ from pathlib import Path
 import pydicom
 
 from .artifacts import inside, load, sha
-from .config import METADATA_FILE
+from .completion import intended_ids
+from .config import CONDITIONS, METADATA_FILE
 from .decoding import Decoder, select_decoder
 from .exporting import Exporter, InspectorExporter, export_instance, export_provenance
 from .measurements import matched_inventory, measurements, recovered_conditions
@@ -35,18 +36,34 @@ def compare_instance(instance, out, decoder_name, decoder, exporter):
     return InstanceComparison(records, provenance, rows)
 
 
-def compare_entries(manifest, root, out, decoder, exporter):
-    run = ComparisonRun()
-    name = manifest.get("decoder", "native")
-    for entry in manifest["objects"]:
-        if entry.get("status") != "accepted":
-            continue
+def require_success(result):
+    labels = [row["condition"] for row in result.measurements]
+    if len(labels) != len(CONDITIONS) or set(labels) != set(CONDITIONS):
+        raise ValueError("Missing or duplicate comparison condition")
+    if not all(row["png_matches_transform"] for row in result.measurements):
+        raise ValueError("Exported pixels disagree with documented transformation")
+
+
+def process_entry(run, entry, root, out, decoder_name, decoder, exporter):
+    instance = None
+    try:
         instance = load_instance(entry, root)
         run.items.append((entry["id"], instance.dataset))
-        try:
-            run.accept(compare_instance(instance, out, name, decoder, exporter))
-        except Exception as exc:
-            run.reject(instance, exc)
+        result = compare_instance(instance, out, decoder_name, decoder, exporter)
+        require_success(result)
+        run.accept(result)
+    except Exception as exc:
+        run.reject(entry["id"], instance, exc)
+
+
+def compare_entries(manifest, root, out, decoder, exporter):
+    intended = intended_ids(manifest)
+    run = ComparisonRun()
+    for entry in manifest["objects"]:
+        if entry["id"] in intended:
+            process_entry(
+                run, entry, root, out, manifest.get("decoder", "native"), decoder, exporter
+            )
     return run
 
 
@@ -66,7 +83,9 @@ def compare(
     exporter: Exporter | None = None,
 ) -> dict:
     manifest_path = Path(manifest_path).resolve()
-    manifest, out = load(manifest_path), prepare_output(out)
+    manifest = load(manifest_path)
+    intended_ids(manifest)
+    out = prepare_output(out)
     decoder = select_decoder(manifest.get("decoder", "native"), decoder_backend)
     exporter = exporter if exporter is not None else InspectorExporter()
     return run_and_write(manifest_path, manifest, out, decoder, exporter)

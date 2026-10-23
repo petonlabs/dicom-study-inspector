@@ -11,6 +11,7 @@ from .artifacts import (
     versions,
     write_csv,
 )
+from .completion import comparison_passed, completion_fields, successful_ids
 from .config import (
     CHECKSUMS_FILE,
     CONDITIONS,
@@ -20,7 +21,7 @@ from .config import (
     S3_ROOT,
     SUMMARY_FILE,
 )
-from .structure import chronology, uid
+from .structure import chronology, group_series, uid
 
 LIMITATIONS = [
     "One public individual; convenience sample, not cohort evidence.",
@@ -33,7 +34,7 @@ REPORT_COMMANDS = "Run `python study_compare.py compare --manifest <manifest.jso
 
 
 def successful_items(run):
-    successful = {e["instance"] for e in run.exports}
+    successful = successful_ids(run)
     return [(name, ds) for name, ds in run.items if name in successful]
 
 
@@ -46,39 +47,39 @@ def coverage(run):
     }
 
 
-def public_source_evidence(manifest, run):
-    successful = {e["instance"] for e in run.exports}
-    return manifest.get("dataset") == DATASET_NAME and all(
-        e.get("url", "").startswith(S3_ROOT + "dicom/") and e.get("retrieved_at")
+def real_successes(manifest, run):
+    successful = successful_ids(run)
+    if manifest.get("dataset") != DATASET_NAME:
+        return set()
+    return {
+        e["id"]
         for e in manifest["objects"]
         if e["id"] in successful
-    )
+        and e.get("url", "").startswith(S3_ROOT + "dicom/")
+        and e.get("retrieved_at")
+    }
 
 
-def comparison_passed(run):
-    return (
-        bool(run.exports)
-        and len(run.measurements) == 3 * len(run.exports)
-        and all(r["png_matches_transform"] for r in run.measurements)
-    )
+def public_source_evidence(manifest, run):
+    successful = successful_ids(run)
+    return bool(successful) and real_successes(manifest, run) == successful
 
 
 def cross_modality_coverage(run, covered):
-    series = Counter(uid(ds, "SeriesInstanceUID") for _, ds in successful_items(run))
     return (
         {"CT", "MR", "PT", "DX"}.issubset(covered["modality_coverage"])
         and covered["distinct_recorded_dates"] >= 2
-        and any(key and count >= 2 for key, count in series.items())
+        and has_distinct_series_sample(run)
     )
 
 
 def acceptance_gates(manifest, run, covered):
-    passed = comparison_passed(run)
+    passed = comparison_passed(manifest, run)
     public = bool(public_source_evidence(manifest, run))
     return {
         "comparison_passed": passed,
         "public_source_provenance_recorded": public,
-        "first_milestone": passed and public,
+        "first_milestone": bool(real_successes(manifest, run)),
         "cross_modality_complete": passed and public and cross_modality_coverage(run, covered),
     }
 
@@ -121,7 +122,7 @@ def summary(manifest_path, manifest, run, tree):
         **inventory_counts(run.inventory),
         **acceptance_gates(manifest, run, covered),
         "limitations": LIMITATIONS.copy(),
-        **condition_totals(run.measurements),
+        **experiment_totals(manifest, run),
     }
 
 
@@ -150,3 +151,21 @@ def write_results(out, manifest_path, run, tree, result):
     dump(out / SUMMARY_FILE, result)
     write_report(out, result)
     dump(out / CHECKSUMS_FILE, artifact_hashes(out))
+
+
+def experiment_totals(manifest, run):
+    return {**condition_totals(run.measurements), **completion_fields(manifest, run)}
+
+
+def has_distinct_series_sample(run):
+    for group in group_series(successful_items(run)).values():
+        parents = {uid(ds, "StudyInstanceUID") for _, ds in group}
+        instances = {uid(ds, "SOPInstanceUID") for _, ds in group}
+        if (
+            len(parents) == 1
+            and None not in parents
+            and None not in instances
+            and len(instances) >= 2
+        ):
+            return True
+    return False

@@ -55,7 +55,7 @@ class ComparisonRun:
         self.measurements.extend(result.measurements)
         self.exports.append(result.export)
 
-    def reject(self, instance: InstanceInput, error: Exception):
-        name = instance.entry["id"]
-        self.inventory.extend({"instance": name, **row} for row in instance.inventory)
+    def reject(self, name: str, instance: InstanceInput | None, error: Exception):
+        if instance is not None:
+            self.inventory.extend({"instance": name, **row} for row in instance.inventory)
         self.failures.append({"instance": name, "error": str(error)})

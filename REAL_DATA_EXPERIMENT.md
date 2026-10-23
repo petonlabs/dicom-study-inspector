@@ -258,3 +258,11 @@ The source manifest and all patient-level evidence remain local under ignored
 no dataset content is committed or uploaded. No merge or research publication was performed.
 Independent technical review supports the experiment; human approval is still required before
 calling the research output final.
+
+## Independent scientific verification follow-up
+
+The [2026-10-22 verification report](SCIENTIFIC_VERIFICATION.md) independently
+reconciles the frozen metadata counts, pixel metrics and sample coverage, documents
+corrected completion semantics, and states the scope of the publication recommendation.
+It supersedes the earlier verification description for those checks; historical
+measurements above remain unchanged.
