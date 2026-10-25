@@ -1,0 +1,64 @@
+name: Pre-access DICOM contract
+
+on:
+  push:
+    branches:
+      - main
+      - "experiment/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: python -m pytest -q
+
+      - name: Build deterministic synthetic ECHOVIEW fixture
+        run: python make_preaccess_fixture.py --out review/preaccess_fixture --n 36
+
+      - name: Run 20-case inspection contract
+        run: |
+          python echoview_inspect_v2.py \
+            --echoview review/preaccess_fixture/MIMIC_ECHO_View_Classifications.synthetic.csv \
+            --record-list review/preaccess_fixture/echo-record-list.synthetic.csv \
+            --dicom-root review/preaccess_fixture/dicom \
+            --out review/preaccess_run \
+            --n 20
+
+      - name: Verify contract outputs
+        run: python verify_preaccess_outputs.py --out review/preaccess_run
+
+      - name: Build reproducible container
+        run: docker build -t dicom-study-inspector:ci .
+
+      - name: Run contract inside container
+        run: docker run --rm dicom-study-inspector:ci
+
+      - name: Upload audit outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preaccess-audit
+          path: |
+            review/preaccess_run/inspection_cases.csv
+            review/preaccess_run/metadata_inventory.csv
+            review/preaccess_run/potential_leakage_hits.csv
+            review/preaccess_run/inspection_summary.json
+          if-no-files-found: warn
+          retention-days: 14
